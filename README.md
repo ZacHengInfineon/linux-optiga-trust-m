@@ -40,42 +40,13 @@
     - [trustm\_protected\_update\_data](#trustm_protected_update_data)
     - [trustm\_update\_with\_PBS\_Auto](#trustm_update_with_pbs_auto)
     - [trustm\_probe](#trustm_probe)
-  - [OPTIGA™ Trust M3 OpenSSL Engine usage](#optiga-trust-m3-openssl-engine-usage)
+  - [OPTIGA™ Trust M OpenSSL Provider usage](#provider_usage)
     - [rand](#rand)
     - [req](#req)
     - [pkey](#pkey)
-    - [dgst](#dgst)
-    - [Testing TLS connection with ECC key](#testing-tls-connection-with-ecc-key)
-      - [Scenario where Trust M is on the client :](#scenario-where-trust-m-is-on-the-client-)
-      - [Scenario where Trust M is on the server :](#scenario-where-trust-m-is-on-the-server-)
-    - [Testing TLS connection with RSA key](#testing-tls-connection-with-rsa-key)
-      - [Scenario where Trust M is on the client :](#scenario-where-trust-m-is-on-the-client--1)
-      - [Scenario where Trust M is on the server :](#scenario-where-trust-m-is-on-the-server--1)
-    - [Generating a Test Server Certificate](#generating-a-test-server-certificate)
-    - [Using OPTIGA™ Trust M OpenSSL engine to sign and issue certificate](#using-optiga-trust-m-openssl-engine-to-sign-and-issue-certificate)
-      - [Generating CA key pair and Creating OPTIGA™ Trust M CA self sign certificate](#generating-ca-key-pair-and-creating-optiga-trust-m-ca-self-sign-certificate)
-      - [Generating a Certificate Request (CSR)](#generating-a-certificate-request-csr)
-      - [Signing and issuing the Certificate with Trust M](#signing-and-issuing-the-certificate-with-trust-m)
-    - [Simple Server and Client Examples on OpenSSL using C language](#simple-server-and-client-examples-on-openssl-using-c-language)
-      - [Server and Client example with pre-provisioned key(0xE0F0) and Certificate(0xE0E0)](#server-and-client-example-with-pre-provisioned-key0xe0f0-and-certificate0xe0e0)
-      - [Server Setup](#server-setup)
-        - [Getting the 0xE0E0 Certificate in OPTIGA™ Trust M and save it as test\_e0e0.crt](#getting-the-0xe0e0-certificate-in-optiga-trust-m-and-save-it-as-test_e0e0crt)
-        - [CA Certificate](#ca-certificate)
-        - [simpleTest\_Server Code Configuration](#simpletest_server-code-configuration)
-      - [Client Setup](#client-setup)
-        - [simpleTest\_Client Code Configuration](#simpletest_client-code-configuration)
-      - [Running the demonstration](#running-the-demonstration)
-      - [Running the Server](#running-the-server)
-      - [Running the Client](#running-the-client)
-      - [Server and Client example with key (0xE0F1) with external public key and Certificate](#server-and-client-example-with-key-0xe0f1-with-external-public-key-and-certificate)
-    - [NGINX Web Server and CURL Client Examples](#nginx-web-server-and-curl-client-examples)
-      - [CURL and NGINX Simple Server and Client Connection](#curl-and-nginx-simple-server-and-client-connection)
-        - [Install CURL and NGINX](#install-curl-and-nginx)
-        - [Server and client keys and certificates](#server-and-client-keys-and-certificates)
-        - [Generate Server key and certificate](#generate-server-key-and-certificate)
-        - [Generate  Client key and certificate](#generate--client-key-and-certificate)
-        - [Setup NGINX](#setup-nginx)
-        - [Testing CURL Client with OPTIGA™ Trust M Key](#testing-curl-client-with-optiga-trust-m-key)
+    - [pkeyutl](#pkeyutl)
+    - [Testing TLS connection with RSA key](#test_tls_rsa)
+    - [Generating a Test Server Certificate](#test_server_cert)
   - [Known observations](#known-observations)
     - [Secure communication bypass](#secure-communication-bypass)
     - [OPTIGA™ Trust M Sporadic hang](#optiga-trust-m-sporadic-hang)
@@ -85,7 +56,7 @@
 This is a Linux Tools for OPTIGA Trust M1/M3 on Linux platform that consist of:
 
 - [Command Line Interface examples](#cli_usage)
-- [OpenSSL Engine](#engine_usage)
+- [OpenSSL Provider](#provider_usage)
 - [AWS IoT C SDK example](./ex_aws-iot-device-sdk-embedded-C-1.1.2/)
 
 
@@ -93,9 +64,8 @@ This is a Linux Tools for OPTIGA Trust M1/M3 on Linux platform that consist of:
 
 Following is the software component to build the tools :
 * GCC
-* OpenSSL development library (libssl-dev)
-* OpenSSL 1.1.1d
-* OPTIGA Trust M1/M3 library (source code)
+* OpenSSL 3.x
+* OPTIGA Trust M3 library (source code)
 * pthread
 * rt
 
@@ -107,6 +77,10 @@ Hardware platforms and boards:
 
 * [Shield2Go Adapter for Raspberry Pi](https://www.infineon.com/cms/en/product/evaluation-boards/s2go-adapter-rasp-pi-iot/)
 
+  
+  
+  Note: OPTIGA™ Trust M Provider is tested on Linux Raspberry PI 6.1.21-v8+ aarch64
+  
   ![](/pictures/coonection_diagram1.png)
 
 ## <a name="getting_started"></a>Getting Started
@@ -126,10 +100,10 @@ foo@bar:~$ git submodule update -f
 ```
 
 ### <a name="build_lib"></a>First time building the library
-Run the commands below to install the required dependencies and Linux tools for optiga trust m 
+Run the commands below in sequence to install the required dependencies and the OPTIGA™ Trust M provider. 
 
     foo@bar:~$ cd linux-optiga-trust-m
-    foo@bar:~$ ./trustm_installation_script.sh
+    foo@bar:~$ ./provider_installation_script.sh
 
 Note: 
 
@@ -1338,11 +1312,9 @@ foo@bar:~$ ./bin/trustm_probe
 ```
 
 
-## <a name="engine_usage"></a>OPTIGA™ Trust M3 OpenSSL Engine usage
+## ## <a name="provider_usage"></a>OPTIGA™ Trust M3 OpenSSL Provider usage
 
-The Engine is tested base on OpenSSL version 1.1.1d
-
-*Note : The OPTIGA™ Trust M Engine shielded communication depends on the default reset protection level for OPTIGA CRYPT and UTIL APIs. If the setting is set to OPTIGA_COMMS_NO_PROTECTION than the engine will not have shielded communication protection.*
+The Provider is tested base on OpenSSL version 3.1.0
 
 ### <a name="rand"></a>rand
 
@@ -1350,16 +1322,16 @@ Usuage : Random number generation
 Example
 
 ```console 
-foo@bar:~$ openssl rand -engine trustm_engine -base64 1024
+foo@bar:~$ openssl rand -provider trustm_provider -base64 32
 ```
 *Note :* 
 *If OPTIGA™ Trust M random number generation fails, there will still be random number output.* 
-*This is control by OpenSSL engine do not have control over it.*
+*This is control by OpenSSL provider do not have control over it.*
 
 ### <a name="req"></a>req
 Usuage : Certificate request / self signed cert / key generation
 
-OPTIGA™ Trust M engine uses the -key parameter to pass input to the key generation/usage function.
+OPTIGA™ Trust M provider uses the -key parameter to pass input to the key generation/usage function.
 
 Following is the input format:
 
@@ -1373,8 +1345,11 @@ where :
 - **public key input**
 
   - public key file name in PEM format
+
   - \* = no public input
+
   - ^ = public key store in Application OID Key
+
     - 0xE0F1 store in 0xF1D1,
 
     - 0xE0F2 store in 0xF1D2,
@@ -1390,6 +1365,7 @@ where :
     - 0xE0F1 store in 0xF1E0,
 
     - 0xE0F2 store in 0xF1E1
+  
 - **NEW**
 
   - Generate new key pair in OPTIGA™ Trust M
@@ -1419,7 +1395,7 @@ where :
 Example : Generating a certificate request using OID 0xE0F3 with new key generated, ECC 384 key length and Auth/Enc/Sign usage. Verify that public key match the private key in the OID.
 
 ```console 
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine -key 0xe0f3:*:NEW:0x04:0x13 -new -out test_e0f3.csr -verify
+foo@bar:~$ openssl req -provider trustm_provider -key 0xe0f3:*:NEW:0x04:0x13 -new -out test_e0f3.csr -verify
 ```
 *Note:*
 *If wrong public is used or no pubkey is submitted the certificate generation will still* 
@@ -1428,7 +1404,7 @@ foo@bar:~$ openssl req -keyform engine -engine trustm_engine -key 0xe0f3:*:NEW:0
 ### <a name="pkey"></a>pkey
 Usuage : Key tools / Key generation
 
-OPTIGA™ Trust M engine uses the -in parameter to pass input to the key generation/usage function.
+OPTIGA™ Trust M provider uses the -in parameter to pass input to the key generation/usage function.
 
 Following is the input format:
 
@@ -1439,189 +1415,43 @@ Following is the input format:
 Example: 
 
 ```console 
-foo@bar:~$ openssl pkey -engine trustm_engine -pubout -inform engine -in 0xe0f1:*:NEW -out testpube0f1.pem
+openssl pkey -provider trustm_provider -in 0xe0fd:*:NEW:0x42:0x13 -pubout -out e0fd_pub.pem
 ```
 
-### <a name="dgst"></a>dgst
+### ### <a name="pkeyutl"></a>pkeyutl
 Usage : Sign and verify
 Example:
 
+Signing the message in the test_sign.txt file using the TrustM EC key and saving the generated signature in the test_sign.sig file.
+
 ```console 
-foo@bar:~$ openssl dgst -sign 0xe0f1 -engine trustm_engine -keyform engine -out helloworld.sig helloworld.txt
+foo@bar:~$ openssl pkeyutl -provider trustm_provider -inkey 0xe0fd:^  -sign -rawin -in test_sign.txt -out test_sign.sig
 ```
+Verifying the signature of the raw input data in test_sign.txt using the provided public key in eofd_pub.pem and the signature in test_sign.sig
+
 ```console 
-foo@bar:~$ openssl dgst -sha256 -verify testpube0f1.pem -signature helloworld.sig helloworld.txt
+foo@bar:~$ openssl pkeyutl -verify -pubin -inkey e0fd_pub.pem -rawin -in test_sign.txt -sigfile test_sign.sig
 ```
 
-### <a name="test_tls_ecc"></a>Testing TLS connection with ECC key
+### ### <a name="test_tls_rsa"></a>Testing TLS connection with RSA key
 
 #### Scenario where Trust M is on the client :
 
-*Note : To generate a test server certificate refer to [Generating a Test Server Certificate](#testServercert)* 
-
-Creates new ECC 256 key length and Auth/Enc/Sign usage and generate a certificate  request for OPTIGA™ Trust M key 0xE0F1
-
-```console
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine \
--key 0xe0f1:^:NEW:0x03:0x13 \
--new \
--out test_e0f1.csr
-```
-
-Issue the certificate with keyUsage=digitalSignature,keyEncipherment on the client side with OPTIGA_Trust_M_Infineon_Test_CA.
-
-*Note : Refer to [Generating a Test Server Certificate](#testServercert)  for openssl.cnf*
-
-```console
-foo@bar:~$ openssl x509 -req -in test_e0f1.csr \
--CA scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--CAkey scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA_Key.pem \
--CAcreateserial \
--out test_e0f1.crt \
--days 365 \
--sha256 \
--extfile openssl.cnf \
--extensions cert_ext1
-```
-
-Running the test server : 
-
-```console
-foo@bar:~$ openssl s_server \
--cert test_opensslserver.crt \
--key privkey.pem -accept 5000 \
--verify_return_error \
--Verify 1 \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem 
-```
-
-Running the test client : *(open a new console)* 
-
-```console
-foo@bar:~$ openssl s_client \
--connect 127.0.0.1:5000 \
--client_sigalgs ECDSA+SHA256 \
--keyform engine \
--engine trustm_engine \
--cert test_e0f1.crt -key 0xe0f1:^ \
--tls1_2 \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--verify 1
-```
-
-#### Scenario where Trust M is on the server :
-
-Creates new ECC 256 key length and Auth/Enc/Sign usage and generate a certificate  request for OPTIGA™ Trust M key 0xE0F2
-
-```console
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine \
--key 0xe0f2:^:NEW:0x03:0x13 \
--new \
--out test_e0f2.csr
-```
-
-Issue the certificate with keyUsage=keyCertSign, cRLSign, digitalSignature on the server side with OPTIGA_Trust_M_Infineon_Test_CA.
-
-```console
-foo@bar:~$ openssl x509 -req -in test_e0f2.csr \
--CA scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--CAkey scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA_Key.pem \
--CAcreateserial \
--out test_e0f2.crt \
--days 365 \
--sha256 \
--extfile openssl.cnf \
--extensions cert_ext2
-```
-
-Running the test server : 
-
-```console
-foo@bar:~$ openssl s_server -keyform engine -engine trustm_engine \
--cert test_e0f2.crt \
--key 0xe0f2:^ \
--accept 5000 \
--verify_return_error \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--sigalgs ECDSA+SHA256
-```
-
-Running the test client : *(open a new console)* 
-
-```console
-foo@bar:~$ openssl s_client \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--connect 127.0.0.1:5000 -tls1_2
-```
-
-### <a name="test_tls_rsa"></a>Testing TLS connection with RSA key
-
-#### Scenario where Trust M is on the client :
-
-*Note : To generate a test server certificate refer to [Generating a Test Server Certificate](#testServercert)* 
+*Note : To generate a test server certificate refer to [Generating a Test Server Certificate](#test_server_cert)* 
 
 Creates new RSA 2048 key length and Auth/Enc/Sign usage and generate a certificate  request for OPTIGA™ Trust M key 0xE0FC
 
 ```console
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine \
--key 0xe0fc:^:NEW:0x42:0x13 \
+foo@bar:~$ openssl req -provider trustm_provider \
+-key 0xe0fd:*:NEW:0x42:0x13 \
 -new \
--out test_e0fc.csr
+-subj "/C=SG/CN=TrustM/O=Infineon" \
+-out test_e0fd.csr
 ```
 
 Issue the certificate with keyUsage=digitalSignature,keyEncipherment on the client side with OPTIGA_Trust_M_Infineon_Test_CA.
 
-*Note : Refer to [Generating a Test Server Certificate](#testServercert)  for openssl.cnf*
-
-```console
-foo@bar:~$ openssl x509 -req -in test_e0fc.csr \
--CA scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--CAkey scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA_Key.pem \
--CAcreateserial \
--out test_e0fc.crt \
--days 365 \
--sha256 \
--extfile openssl.cnf \
--extensions cert_ext1
-```
-
-Running the test server : 
-
-```console
-foo@bar:~$ openssl s_server \
--cert test_opensslserver.crt \
--key privkey.pem -accept 5000 \
--verify_return_error \
--Verify 1 \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem 
-```
-
-Running the test client : *(open a new console)* 
-
-```console
-foo@bar:~$ openssl s_client -connect 127.0.0.1:5000 \
--client_sigalgs RSA+SHA256 \
--keyform engine \
--engine trustm_engine \
--cert test_e0fc.crt \
--key 0xe0fc:^ \
--tls1_2 \
--CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--verify 1
-```
-
-#### Scenario where Trust M is on the server :
-
-Creates new RSA 2048 key length and Auth/Enc/Sign usage and generate a certificate  request for OPTIGA™ Trust M key 0xE0FD
-
-```console
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine \
--key 0xe0fd:^:NEW:0x42:0x13 \
--new \
--out test_e0fd.csr
-```
-
-Issue the certificate with keyUsage=keyCertSign, cRLSign, digitalSignature on the server side with OPTIGA_Trust_M_Infineon_Test_CA.
+**Note : Refer to [Generating a Test Server Certificate](#test_server_cert)  for openssl.cnf**
 
 ```console
 foo@bar:~$ openssl x509 -req -in test_e0fd.csr \
@@ -1632,17 +1462,17 @@ foo@bar:~$ openssl x509 -req -in test_e0fd.csr \
 -days 365 \
 -sha256 \
 -extfile openssl.cnf \
--extensions cert_ext2
+-extensions cert_ext1
 ```
 
 Running the test server : 
 
 ```console
-foo@bar:~$ openssl s_server -keyform engine -engine trustm_engine \
--cert test_e0fd.crt \
--key 0xe0fd:^ \
--accept 5000 \
+foo@bar:~$ openssl s_server \
+-cert test_opensslserver.crt \
+-key privkey.pem -accept 5000 \
 -verify_return_error \
+-Verify 1 \
 -CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
 -sigalgs RSA+SHA256
 ```
@@ -1650,23 +1480,75 @@ foo@bar:~$ openssl s_server -keyform engine -engine trustm_engine \
 Running the test client : *(open a new console)* 
 
 ```console
-foo@bar:~$ openssl s_client \
+foo@bar:~$ openssl s_client -provider trustm_provider -provider default \
+-client_sigalgs RSA+SHA256 \
+-cert test_e0fd.crt \
+-key 0xe0fd:^ \
+-connect localhost:5000 \
+-tls1_2 \
 -CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
--connect 127.0.0.1:5000 -tls1_2
+-verify 1 
 ```
 
-### <a name="testServercert"></a>Generating a Test Server Certificate
+#### Scenario where Trust M is on the server :
 
- Generate a new key pair and certificate request. Private key is output to private.pem
+Creates new RSA 2048 key length and Auth/Enc/Sign usage and generate a certificate  request for OPTIGA™ Trust M key 0xE0FD
 
 ```console
-foo@bar:~$ openssl req -new -out test_opensslserver.csr
+openssl req -provider trustm_provider -key 0xe0fc:*:NEW:0x42:0x13 -new -subj "/C=SG/CN=TrustM/O=Infineon" -out test_e0fc.csr
+```
+
+Issue the certificate with keyUsage=keyCertSign, cRLSign, digitalSignature on the server side with OPTIGA_Trust_M_Infineon_Test_CA.
+
+```console
+openssl x509 -req -in test_e0fc.csr -CA  scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
+-CAkey scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA_Key.pem \
+-CAcreateserial \
+-out test_e0fc.crt \
+-days 365 \
+-sha256 \
+-extfile openssl.cnf \
+-extensions cert_ext2
+```
+
+Running the test server : 
+
+```console
+foo@bar:~$ openssl s_server -provider trustm_provider -provider default \
+-cert test_e0fc.crt \
+-key 0xe0fc:^ \
+-accept 5000 \
+-verify_return_error \
+-CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
+-sigalgs RSA+SHA256 
+```
+
+Running the test client : *(open a new console)* 
+
+```console
+foo@bar:~$ openssl s_client \
+-CAfile scripts/certificates/OPTIGA_Trust_M_Infineon_Test_CA.pem \
+-connect localhost:5000 -tls1_2
+-client_sigalgs RSA+SHA256
+```
+
+### ### <a name="test_server_cert"></a>Generating a Test Server Certificate
+
+Generate a new key pair and certificate request. Private key is output to private.pem
+
+```console
+foo@bar:~$ openssl req -new -nodes -subj "/C=SG/O=Infineon" -out test_opensslserver.csr
 ```
 
 Creates the openssl.cnf with the below contain:
 
 ```console
 foo@bar:~$ cat openssl.cnf 
+```
+
+Creates and displays the openssl.cnf as shown below:
+
+```console
 [ cert_ext ]
 subjectKeyIdentifier=hash
 keyUsage=critical,digitalSignature,keyEncipherment
@@ -1696,359 +1578,7 @@ foo@bar:~$ openssl x509 -req -in test_opensslserver.csr \
 -extensions cert_ext2
 ```
 
-### <a name="issue_cert"></a>Using OPTIGA™ Trust M OpenSSL engine to sign and issue certificate
 
-In this section, we will demonstrate how you can use OPTIGA™ Trust M OpenSSL engine to enable OPTIGA™ Trust M as a simple Certificate Authorities (CA) without revocation and tracking of certificate it issue.
-
-#### Generating CA key pair and Creating OPTIGA™ Trust M CA self sign certificate
-
-Create OPTIGA™ Trust M CA key pair with the following parameters:
-
-- OID 0xE0F2
-- public key store in 0xE1D2
-- Self signed CA cert with subject :
-  - Organization : Infineon OPTIGA(TM) Trust M
-  - Common Name : UID of Trust M
-  - expiry days : ~10 years
-
-```console
-foo@bar:~$ openssl req -keyform engine -engine trustm_engine \
--key 0xe0f2:^:NEW:0x03:0x13 \
--new \
--x509 \
--days 3650 \
--subj /O="Infineon OPTIGA(TM) Trust M"\
-/CN="CD16336B01001C000100000A085255000A005C0046801010711118" \
--out test_e0f2.crt
-```
-
-#### Generating a Certificate Request (CSR)
-
-You may use the example given in [req](#req) to generate a CSR or used any valid CSR
-
-#### Signing and issuing the Certificate with Trust M
-
-Following demonstrate how you can issue and sign certificate with OPTIGA™ Trust M with the following inputs:
-
-- input csr file : test_e0f3.csr
-- CA Cert : test_e0f2.crt
-- CA key : 0xE0F2 with public key store in 0xE1D2
-- Create new serial number for certificate (serial number is store in test_e0f3.srl)
-- using extension cert_ext in extension file
-- expiry days : 1 year
-
-*Note : Refer to [Generating a Test Server Certificate](#testServercert)  for openssl.cnf*
-
-```console
-foo@bar:~$ openssl x509 -CAkeyform engine -engine trustm_engine \
--req \
--in test_e0f3.csr \
--CA test_e0f2.crt \
--CAkey 0xe0f2:^ \
--CAcreateserial \
--out test_e0f3.crt \
--days 365 \
--sha256 \
--extfile openssl.cnf \
--extensions cert_ext
-```
-
-### <a name="opensslc"></a>Simple Server and Client Examples on OpenSSL using C language
-
-In this section, we will describe and demo how the OPTIGA™ Trust M OpenSSL engine could be coded in 'C' to perform TLS/DTLS communication.
-
-*Note : The code only shows example on using OPTIGA™ Trust M for authentication and the secure communication is done via OpenSSL.*
-
-#### <a name="server_client_preprovisioned"></a>Server and Client example with pre-provisioned key(0xE0F0) and Certificate(0xE0E0)
-
-For easy setup, the demo uses the following input for :
-
-- Server (system with OPTIGA™ Trust M and listening to connection) 
-  - server certificate : cert store in oid 0xE0E0
-  - OPTIGA™ Trust M key : 0xE0F0
-  - CA certificate :  Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem
-    - include with Infineon OPTIGA(TM) ECC Root CA 2 certificate
-    - include with Infineon OPTIGA(TM) Trust M CA 300.pem
-  - Port : 5000
-  - SSL Protocol : TLS1.3
-- Client (system that send HELLO request) 
-  - - CA certificate :  Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem
-      - include with Infineon OPTIGA(TM) ECC Root CA 2 certificate
-      - include with Infineon OPTIGA(TM) Trust M CA 300.pem
-  - IP : 127.0.0.1
-  - Port : 5000
-  - SSL Protocol : DTLS1.3
-
-#### Server Setup
-
-##### Getting the 0xE0E0 Certificate in OPTIGA™ Trust M and save it as test_e0e0.crt
-
-You may use the below example to get the cert.
-
-```console
-foo@bar:~$ ./bin/trustm_cert -r 0xe0e0 -o test_e0e0.crt
-========================================================
-OID              : 0xE0E0 
-Output File Name : test_e0e0.crt 
-Success!!!
-========================================================
-```
-
-##### CA Certificate
-
-Ensure *Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem* is in the same directory as test_e0e0.crt.
-
-The *Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem* contain 2 certificate namely:
-
-- Infineon OPTIGA(TM) Trust M CA 300 
-- Infineon OPTIGA(TM) ECC Root CA 2
-
-Below is a quick tips for verifying the Server cert matches the CA cert with OpenSSL
-
-```console
-foo@bar:~$ openssl verify -CAfile 'Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem' -show_chain test_e0e0.crt 
-test_e0e0.crt: OK
-Chain:
-depth=0: CN = InfineonIoTNode (untrusted)
-depth=1: C = DE, O = Infineon Technologies AG, OU = OPTIGA(TM), CN = Infineon OPTIGA(TM) Trust M CA 300
-depth=2: C = DE, O = Infineon Technologies AG, OU = OPTIGA(TM) Devices, CN = Infineon OPTIGA(TM) ECC Root CA 2
-```
-
-##### <a name="simpleTest_Server_Code_Configuration"></a>simpleTest_Server Code Configuration
-
-```c
-// Macro for Keys/Certificates
-#define SERVER_CERT     "test_e0e0.crt"
-#define SERVER_KEY      "0xe0f0"
-#define CA_CERT         "Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem"
-
-// Macro for Engine
-#define ENGINE_NAME     "trustm_engine"
-
-// Default IP/PORT
-#define DEFAULT_IP      "127.0.0.1"
-#define DEFAULT_PORT    5000
-#define SECURE_COMM   TLS_server_method()
-//#define SECURE_COMM     DTLS_server_method()
-```
-
-In the *simpleTest_Server.c* code ~ line number 54-66. List the macro for changing following input:
-
-- SERVER_CERT      *\<filename for server certificate in PEM format>*
-- SERVER_KEY        *\<OID of OPTIGA™ Trust M key used. Refer to [req](#req) for the key input format>*
-- CA_CERT              *\<CA Certificate filename. if CA cert is chain ensure all cert is in the chain>*
-- ENGINE_NAME    *\<OPTIGA™ Trust M engine name>*
-- DEFAULT_IP         *\<IP address, not important for server>*
-- DEFAULT_PORT   *\<Port to use for connection>*
-- SECURE_COMM   *\<SSL Protocol to be used TLS/DTLS>*
-
-#### Client Setup
-
-Ensure *Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem* is in the current directory.
-
-##### <a name="simpleTest_Client_Code_Configuration"></a>simpleTest_Client Code Configuration
-
-```c
-// Macro for Keys/Certificates
-#define CA_CERT      "Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem"
-
-// Macro for Engine
-#define ENGINE_NAME  "trustm_engine"
-
-// Default IP/PORT
-#define DEFAULT_IP    "127.0.0.1"
-#define	DEFAULT_PORT  5000
-#define SECURE_COMM TLS_client_method()
-//#define SECURE_COMM   DTLS_client_method()
-```
-
-In the *simpleTest_Client.c* code ~ line number 53-63. List the macro for changing following input:
-
-- CA_CERT                *\<CA Certificate filename. if CA cert is chain ensure all cert is in the chain>*
-- ENGINE_NAME     *\<OPTIGA™ Trust M engine name>*
-- DEFAULT_IP         *\<IP address, not important for server>*
-- DEFAULT_PORT   *\<Port to use for connection>*
-- SECURE_COMM   *\<SSL Protocol to be used TLS/DTLS>*
-
-
-
-#### Running the demonstration
-
-As the default IP is set to a loopback IP 127.0.0.1 both the server and client need to be run on the same system. To run the client and server on a different system please refer to [simpleTest_Server Code Configuration](#simpleTest_Server_Code_Configuration) and [simpleTest_Client Code Configuration](#simpleTest_Client_Code_Configuration)
-
-To build the demo refer to [First time building the library](#build_lib)
-
-#### Running the Server
-
-Open a new terminal in the system and ensure ***test_e0e0.crt*** and ***Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem*** is in the current folder. 
-
-In this example, ***test_e0e0.crt***  need to be copied into folder "**scripts/SimpleServeClientTest/with_e0f0_key/**" where ***Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem*** is located.  Run "***update latest exe.sh***" to copy simpleTest_Server and simpleTest_Client into this folder before running simpleTest_Server
-
-Configure the path parameters in "**config.sh**" as follow:
-
-```sh
-EXEPATH="/home/pi/linux-optiga-trust-m/bin"
-CERT_PATH="/home/pi/linux-optiga-trust-m/scripts/certificates"
-```
-
-Execute the "***update latest exe.sh***":
-
-```console
-foo@bar:~/linux-optiga-trust-m/scripts/SimpleServeClientTest/with_e0f0_key $ ./update_latest_exe.sh 
-Copy simpleTest executable into current directory
-Read out Certificate
-========================================================
-OID              : 0xE0E0 
-Output File Name : test_e0e0.crt 
-Success!!!
-========================================================
-foo@bar:~/linux-optiga-trust-m/scripts/SimpleServeClientTest/with_e0f0_key $ ls -l
-total 48
--rwxr-xr-x 1 pi pi   107 Sep  9 10:00  config.sh
--rw-r--r-- 1 pi pi  2034 Sep  8 16:34 'Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem'
--rwxr-xr-x 1 pi pi 13688 Sep  9 10:23  simpleTest_Client
--rwxr-xr-x 1 pi pi 14596 Sep  9 10:23  simpleTest_Server
--rw-r--r-- 1 pi pi   741 Sep  9 10:23  test_e0e0.crt
--rwxr-xr-x 1 pi pi   201 Sep  9 10:22  update_latest_exe.sh
-```
-
-
-
-Example of simpleTest_Server running without client connection
-
-```console
-foo@bar:~/linux-optiga-trust-m/scripts/SimpleServeClientTest/with_e0f0_key $ ./simpleTest_Server 
-89 main: *****************************************
-141 serverListen: Listening to incoming connection
-```
-
-#### Running the Client
-
-Open another new terminal in the system and ensure *Infineon OPTIGA(TM) Trust M CA 300 Root CA 2.pem* is in the current folder. Run simpleTest_Client
-
-Example of simpleTest_Client running with connection to server
-
-```console
-foo@bar:~/linux-optiga-trust-m/scripts/SimpleServeClientTest/with_e0f0_key $ ./simpleTest_Client 
-88 main: *****************************************
-113 doClientConnect: s_ipaddr : 127.0.0.1
-150 doClientConnect: Connecting to server ....
-168 doClientConnect: Connected to 127.0.0.1, port :0x8813
-190 doClientConnect: Performing Handshaking .....
-199 doClientConnect: Connection using : TLS_AES_256_GCM_SHA384
-200 doClientConnect:                  : TLSv1.3
-From Server [11072] : 001
-From Server [11072] : 002
-From Server [11072] : 003
-From Server [11072] : 004
-From Server [11072] : 005
-```
-
-Server terminal output
-
-```console
-foo@bar:~/linux-optiga-trust-m/scripts/SimpleServeClientTest/with_e0f0_key $ ./simpleTest_Server 
-89 main: *****************************************
-144 serverListen: Listening to incoming connection
-157 serverListen: Connection from 127.0.0.1, port :0xe48f
-144 serverListen: Listening to incoming connection
-236 doServerConnected: Engine ID : trustm_engine
-242 doServerConnected: Init TrustM Engine. Ok
-248 doServerConnected: Set Default Engine Ok.
-261 doServerConnected: Load Certificate ok
-269 doServerConnected: Private Key Match the Server Certificate.
-278 doServerConnected: Load CA cert ok
-301 doServerConnected: Performing Handshking ......... 
-306 doServerConnected: Connection using : TLS_AES_256_GCM_SHA384
-307 doServerConnected:                  : TLSv1.3
-308 doServerConnected: ++++++++++++++++++++++++++++++++++++++++++++++
-328 doServerConnected: [12081] Received : 1
-328 doServerConnected: [12081] Received : 2
-328 doServerConnected: [12081] Received : 3
-328 doServerConnected: [12081] Received : 4
-328 doServerConnected: [12081] Received : 5
-```
-
-The above console screen show a successful server/client connection via TLS1.3. After the TLS handshake is completed the client will send count from 1 to 100 to the server. When server received the data from client it will is display the info received and send back the Process ID (PID) and data received to the client. The client when received the data from the service, it will display them on the screen.
-
-To run multiple client connection, open another new terminal in the system and ensure *Infineon OPTIGA(TM) Trust M CA 300.pem* is in the current folder. Run simpleTest_Client.
-
-#### Server and Client example with key (0xE0F1) with external public key and Certificate
-
-Go to the subsection at  [Server and Client example with key (0xE0F1) with external public key and Certificate](./scripts/SimpleServeClientTest/SimpleServeClient_with_pubkeyfile/)
-
-### <a name="curl_nginx"></a>NGINX Web Server and CURL Client Examples
-
-#### <a name="curl_nginx_simple"></a>CURL and NGINX Simple Server and Client Connection
-
-In this section, we will describe and demo how the OPTIGA™ Trust M OpenSSL engine could be used in CURL to connect to a NGINX web server.
-
-*Note : Refer to [curl_ngix script folder](./scripts/curl_nginx)  for scripts to run through the following steps*
-
-##### Install CURL and NGINX
-
-```
-sudo apt-get install -y nginx curl
-```
-
-##### Server and client keys and certificates
-
-Go to the scripts/curl_nginx folder
-
-```
-cd scripts/curl_nginx
-```
-
-##### Generate Server key and certificate
-This will generate the server key "server1_privkey.pem" and certificate "server1.crt.pem"
-```
-openssl ecparam -out server1_privkey.pem -name prime256v1 -genkey
-openssl req -new -x509 -key server1_privkey.pem -subj "/CN=Server/O=Infineon/C=SG" -out server1.crt.pem
-```
-
-##### Generate  Client key and certificate
-This will generate client private key(ECC 256, Auth/Enc/Sing) in OPTIGA™ Trust M using using OID 0xe0f1 and certificate "client1.crt.pem" 
-
-(see [req](#req) for input details)
-```
-openssl req -new -x509 -engine trustm_engine -keyform engine -key 0xe0f1:^:NEW:0x03:0x13 -subj "/CN=TrustM/O=Infineon/C=SG" -out client1.crt.pem
-
-```
-
-##### Setup NGINX 
-
-This will setup the NGINX server to use openssl, setting the server key and certificate to use in the default file setting(/etc/nginx/sites-enabled/default).
-The nginx service will be restarted for the new settings to take effect.
-
-
-Run the steps below:
-```
-sudo cp default /etc/nginx/sites-enabled/default
-sudo cp server1.crt.pem /etc/nginx/server1.crt.pem
-sudo cp server1_privkey.pem /etc/nginx/server1_privkey.pem
-sudo service nginx restart
-```
-After running the steps above, the following changes will be made to "default" file:
-```
-listen 443 ssl default_server;
-listen [::]:443 ssl default_server;
-ssl_certificate server1.crt.pem; 
-ssl_certificate_key server1_privkey.pem;
-```
-##### Testing CURL Client with OPTIGA™ Trust M Key 
-
-This will connect the Client to the web server with engine key interface using OPTIGA™ Trust M.  
-
-```
-curl --insecure --engine trustm_engine --key-type ENG --key 0xe0f1:^ --cert client1.crt.pem https://127.0.0.1
-
-```
-
-Additional examples:
-
-[CURL and NGINX_with_CA](./scripts/curl_nginx_with_CA)
-
-[CURL and NGINX with CA and Imported_Keys](./scripts/curl_nginx_imported_key)
 
 ## <a name="known_observations"></a>Known observations
 
